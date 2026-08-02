@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
+<link rel="manifest" href="manifest.json"/>
+<meta name="theme-color" content="#dedad0"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Moje Stavba"/>
+<title>Moje Stavba</title>
+<link rel="stylesheet" href="app.css"/>
+<script>
+  // JEDNORAZOVE zmereni skutecne viditelne vysky okna do CSS promenne.
+  // DUVOD: 100vh/100dvh/100svh samotne obcas na realnem iPhonu ve
+  // standalone PWA rezimu nedosahnou uplne dolu (zbyde proužek pozadi
+  // <body> pod appkou). Toto NENI totez jako drivejsi "sledovani
+  // klavesnice" pres visualViewport (to zpusobovalo regrese - viz
+  // komentar v main.js) - tady se vyska meri jen JEDNOU pri startu a
+  // pri otoceni obrazovky, NIKDY na obycejny 'resize' (ten se spousti
+  // i pri otevreni klavesnice a delal by presne ty stare problemy).
+  //
+  // POZNAMKA: byl tu kratce pokus o opakovane premereni (hned + rAF +
+  // timeouty + visibilitychange), aby se odchytil pripad, kdy prvni
+  // zmereni vyjde moc velke po navratu z pozadi. Ukazalo se ale, ze to
+  // zpusobilo presne opacny problem - jedno z pozdejsich premereni
+  // obcas chytlo MENSI cislo nez skutecna vyska a --app-vh se zmensil,
+  // takze se spodek appky prestal dotahovat dolu (puvodni bug se
+  // vratil v jine podobe). Jedno cisté zmereni pri startu se v praxi
+  // ukazalo jako spolehlivejsi nez opakovane hadani - pokud se tenhle
+  // problem znovu objevi, resit ho jinak nez pridavanim dalsich
+  // remeasure pokusu.
+  (function(){
+    function setAppVh(){
+      document.documentElement.style.setProperty('--app-vh', window.innerHeight + 'px');
+    }
+    setAppVh();
+    window.addEventListener('orientationchange', function(){ setTimeout(setAppVh, 250); });
+    window.addEventListener('pageshow', setAppVh);
+  })();
+</script>
+</head>
+<body>
+
+<!--
+  CELÁ APPKA JE JEDEN PEVNĚ UKOTVENÝ KONTEJNER (#app-shell).
+  position:fixed + inset:0 vždy přesně odpovídá viditelné ploše
+  prohlížeče, bez ohledu na to, jak se mění výška podle skrývání
+  adresního řádku. Uvnitř je to normální flexbox sloupec - horní lišta
+  a spodní navigace jsou obyčejné položky v tomhle sloupci, ne nic
+  "vznášejícího se" navíc. Díky tomu se nemůže stát, že by menu
+  "uteklo" - je to fyzicky součástí té samé ukotvené krabice.
+-->
+<div id="app-shell">
+  <div id="app-frame">
+    <div id="app-content"><!-- sem router vykresluje jednotlivé obrazovky --></div>
+    <nav id="bottom-nav" hidden>
+      <button class="nav-item" data-route="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>
+        <b>Domů</b>
+      </button>
+      <button class="nav-item" data-route="stages">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>
+        <b>Etapy</b>
+      </button>
+      <button class="nav-add" id="navAddBtn">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+      <button class="nav-item" data-route="diary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h9l3 3v13H6z"/><path d="M9 11h6M9 15h6"/></svg>
+        <b>Deník</b>
+      </button>
+      <button class="nav-item" data-route="project">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V9l8-5 8 5v12"/><path d="M9 21v-7h6v7"/></svg>
+        <b>Projekt</b>
+      </button>
+    </nav>
+
+    <!-- rychlé přidání - uvnitř app-frame, ne k celému oknu prohlížeče (jinak by na širší obrazovce uteklo mimo kartu appky) -->
+    <div id="quick-add-backdrop" hidden></div>
+    <div id="quick-add-radial" hidden>
+      <div class="qa-sat" data-target="expense-add" style="--sc:#4dffab">
+        <div class="qa-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h15a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z"/><path d="M16 12h4"/></svg></div>
+        <b>Peníze</b>
+      </div>
+      <div class="qa-sat" data-target="diary-add" style="--sc:#ffd35c">
+        <div class="qa-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l3 3v15H6z"/><path d="M9 10h6M9 14h6"/></svg></div>
+        <b>Zápis</b>
+      </div>
+      <div class="qa-sat" data-target="event-add" style="--sc:#25b7ff">
+        <div class="qa-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="1"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></div>
+        <b>Událost</b>
+      </div>
+      <div class="qa-sat" data-target="photo-add" style="--sc:#b34cff">
+        <div class="qa-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="14" rx="1"/><circle cx="12" cy="13" r="3.5"/></svg></div>
+        <b>Fotky</b>
+      </div>
+      <div class="qa-sat" data-target="task-add" style="--sc:#ff9b32">
+        <div class="qa-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><rect x="3" y="4" width="18" height="17" rx="2"/></svg></div>
+        <b>Úkol</b>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="confirm-overlay">
+  <div class="confirm-sheet">
+    <p id="confirm-message"></p>
+    <div class="confirm-actions">
+      <button class="confirm-cancel" id="confirm-cancel-btn">Zrušit</button>
+      <button class="confirm-ok" id="confirm-ok-btn">Potvrdit</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="supabase-config.js"></script>
+<script src="supabase-client.js"></script>
+<script src="data.js"></script>
+<script src="supabase-data.js"></script>
+<script src="pdf-font.js"></script>
+<script src="pdf-generator.js"></script>
+<script src="icons.js"></script>
+<script src="router.js"></script>
+<script src="layout.js"></script>
+<script src="tour.js"></script>
+<script src="screen-appLock.js"></script>
+<script src="screen-onboarding.js"></script>
+<script src="screen-dashboard.js"></script>
+<script src="screen-stagesWheel.js"></script>
+<script src="screen-stagesList.js"></script>
+<script src="screen-stageDetail.js"></script>
+<script src="screen-newStage.js"></script>
+<script src="screen-diary.js"></script>
+<script src="screen-diaryExport.js"></script>
+<script src="screen-finance.js"></script>
+<script src="screen-transactions.js"></script>
+<script src="screen-stageExpenses.js"></script>
+<script src="screen-gallery.js"></script>
+<script src="screen-calendar.js"></script>
+<script src="screen-project.js"></script>
+<script src="screen-misc.js"></script>
+<script src="screen-important.js"></script>
+<script src="screen-settings.js"></script>
+<script src="screen-legal.js"></script>
+<script src="screen-premiumLogin.js"></script>
+<script src="screen-shareStavba.js"></script>
+<script src="screen-forms.js"></script>
+<script src="main.js"></script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('service-worker.js').catch(()=>{}); });
+}
+</script>
+</body>
+</html>
